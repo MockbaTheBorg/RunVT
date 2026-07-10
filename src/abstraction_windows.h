@@ -23,6 +23,16 @@
 #include <windows.h>
 #include <string.h>
 
+// Trying to work around older headers rather than
+// making everyone upgrade their mingw-w64 package.
+#ifndef PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
+typedef HANDLE HPCON;
+#define PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE 0x00020016
+WINBASEAPI HRESULT WINAPI CreatePseudoConsole(COORD size, HANDLE hInput,
+    HANDLE hOutput, DWORD dwFlags, HPCON *phPC);
+WINBASEAPI void WINAPI ClosePseudoConsole(HPCON hPC);
+#endif
+
 typedef struct RT_Process {
     HPCON hpc;
     HANDLE in_write;   // we write here, ConPTY reads it as child stdin
