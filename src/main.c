@@ -139,9 +139,23 @@ static void handle_textinput(RT_Process *proc, const char *text) {
     }
 }
 
+// Accepts "0xRRGGBB" (or plain decimal, but nobody's going to type
+// that for a color) - strtoul's base-0 already handles the 0x prefix.
+static int parse_hex_color(const char *s, unsigned char rgb[3]) {
+    char *end;
+    unsigned long v = strtoul(s, &end, 0);
+    if (end == s || *end != '\0') return -1;
+    rgb[0] = (unsigned char)((v >> 16) & 0xFF);
+    rgb[1] = (unsigned char)((v >> 8) & 0xFF);
+    rgb[2] = (unsigned char)(v & 0xFF);
+    return 0;
+}
+
 static void print_usage(const char *prog) {
     fprintf(stderr,
-        "usage: %s [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--log=FILE] app [args...]\n",
+        "usage: %s [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS]\n"
+        "       [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB]\n"
+        "       [--log=FILE] app [args...]\n",
         prog);
 }
 
@@ -173,6 +187,21 @@ int main(int argc, char **argv) {
             else g_active_codepage = CODEPAGE_LATIN1;
         } else if (strncmp(argv[i], "--log=", 6) == 0) {
             log_path = argv[i] + 6;
+        } else if (strncmp(argv[i], "--bell=", 7) == 0) {
+            if (parse_hex_color(argv[i] + 7, g_bell_color) != 0) {
+                fprintf(stderr, "%s: --bell wants 0xRRGGBB, e.g. 0x505050\n", argv[0]);
+                return 1;
+            }
+        } else if (strncmp(argv[i], "--normal=", 9) == 0) {
+            if (parse_hex_color(argv[i] + 9, render_palette[7]) != 0) {
+                fprintf(stderr, "%s: --normal wants 0xRRGGBB, e.g. 0xAAAAAA\n", argv[0]);
+                return 1;
+            }
+        } else if (strncmp(argv[i], "--bold=", 7) == 0) {
+            if (parse_hex_color(argv[i] + 7, render_palette[15]) != 0) {
+                fprintf(stderr, "%s: --bold wants 0xRRGGBB, e.g. 0xFFFFFF\n", argv[0]);
+                return 1;
+            }
         } else if (strncmp(argv[i], "--size=", 7) == 0) {
             int c, r;
             if (sscanf(argv[i] + 7, "%dx%d", &c, &r) == 2 && c > 0 && r > 0) {
@@ -294,11 +323,6 @@ int main(int argc, char **argv) {
             wait_prompted = 1;
         }
 
-        if (vp.bell) {
-            render_flash(&ren);
-            vp.bell = 0;
-        }
-
         // SDL tracks capslock as toggle state, not a press/release
         // event we can just forward - poll it and force a status
         // refresh on change so it doesn't wait for some unrelated
@@ -309,6 +333,11 @@ int main(int argc, char **argv) {
             scr.dirty = 1;
         }
 
+        // a bell with nothing else to redraw still needs a fresh frame -
+        // render_flash inverts whatever's currently in the framebuffer,
+        // so it has to be this tick's frame, not a stale one
+        if (vp.bell) scr.dirty = 1;
+
         if (running && scr.dirty) {
             char status_right[64];
             sprintf(status_right, "Row:%02d Col:%02d %s ", scr.cur_y + 1, scr.cur_x + 1,
@@ -316,6 +345,11 @@ int main(int argc, char **argv) {
             scr_set_status(&scr, status_left, status_right);
             render_frame(&ren, &scr, &sixel);
             scr.dirty = 0;
+        }
+
+        if (vp.bell) {
+            render_flash(&ren);
+            vp.bell = 0;
         }
     }
 

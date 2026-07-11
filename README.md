@@ -47,7 +47,10 @@ Just spawn a program and be its terminal.
 - **Window title updates** - apps that send the OSC title sequence (vim,
   tmux, plenty of shells) get to rename the window, same as any other
   terminal would let them.
-- **Bell** - BEL flashes the window instead of doing nothing.
+- **Bell** - BEL fills the window with a solid color for a beat instead
+  of doing nothing. Color's configurable (`--bell`).
+- **Customizable colors** - `--normal`/`--bold` override the default
+  text color (the 16-color SGR palette itself stays put).
 
 ## What it deliberately doesn't do
 
@@ -119,7 +122,9 @@ one, it'll give you a false negative. Test on real Windows (10, build
 ## Usage
 
 ```
-runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--log=FILE] app [args...]
+runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS]
+      [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB]
+      [--log=FILE] app [args...]
 ```
 
 - `app [args...]` - the program to run, and its arguments. Required.
@@ -133,6 +138,14 @@ runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--log=FILE] app [ar
 - `--size=COLSxROWS` - screen size, e.g. `--size=132x43`. Defaults to
   `80x25`. That's the *addressable* area the app gets; the status bar is
   one extra row on top of that.
+- `--bell=0xRRGGBB` - color the visual bell flashes to (see **Bell**
+  below). Defaults to `0x505050`, a dim gray - a full white/inverted
+  flash turned out to be pretty jarring on a black background.
+- `--normal=0xRRGGBB` / `--bold=0xRRGGBB` - override the default text
+  color and its bold variant (what text renders as when nothing sets an
+  explicit SGR color, or resets with `CSI 0m`/`CSI 39m`). Explicit ANSI
+  colors (`CSI 30-37m`, `CSI 90-97m`) are untouched by these - only the
+  "no color specified" case changes.
 - `--log=FILE` - dumps the raw bytes coming from the child to a file.
   Debugging aid, not something you need for normal use.
 
@@ -142,6 +155,7 @@ Examples:
 runvt ./RunCPM
 runvt --size=132x43 bash
 runvt --wait --codepage=cp850 ./RunCPM
+runvt --bell=0x301010 --normal=0x00FF00 ./RunCPM
 ```
 
 ### Keyboard
@@ -154,6 +168,13 @@ it), not what most modern terminals default to. Worth knowing if an app
 seems to eat the wrong character on backspace.
 
 Ctrl+Shift+V pastes whatever's on the system clipboard.
+
+### Bell
+
+BEL (`CHR$(7)` from MBASIC, `printf '\a'` from a shell) fills the window
+with a solid color for a beat and puts the real screen back - a real
+flash, not an OS "attention" hint that most window managers only show as
+a barely-there taskbar dot. Color's `--bell`, default a dim gray.
 
 ## Testing it
 

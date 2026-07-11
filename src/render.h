@@ -23,13 +23,23 @@ typedef struct {
 
 // Standard 16-color ANSI palette (the usual xterm-ish values). VT100
 // hardware itself was monochrome green/amber - this is for the SGR
-// color support we added on top for real-world compatibility.
-static const unsigned char render_palette[16][3] = {
+// color support we added on top for real-world compatibility. Slots 7
+// and 15 are also what plain, no-SGR-color text and its bold variant
+// resolve to (see vt_apply_sgr's reset case and render_blit_cell's bold
+// handling) - --normal/--bold override those two slots in place, main.c
+// does it right after arg parsing, before the window even opens.
+static unsigned char render_palette[16][3] = {
     {0, 0, 0},       {170, 0, 0},     {0, 170, 0},     {170, 85, 0},
     {0, 0, 170},     {170, 0, 170},   {0, 170, 170},   {170, 170, 170},
     {85, 85, 85},    {255, 85, 85},   {85, 255, 85},   {255, 255, 85},
     {85, 85, 255},   {255, 85, 255},  {85, 255, 255},  {255, 255, 255}
 };
+
+// Flash color for the visual bell - a full-screen fill, not an invert,
+// so how bright it feels is entirely up to whatever color is picked
+// here. Defaults to a dim gray rather than the harsh white a naive
+// invert-the-screen approach gives on a typical black background.
+static unsigned char g_bell_color[3] = {0x50, 0x50, 0x50};
 
 static int render_init(Renderer *r, int cols, int total_rows, const char *title) {
     r->pw = cols * FONT_W;
@@ -54,10 +64,24 @@ static int render_init(Renderer *r, int cols, int total_rows, const char *title)
     return 0;
 }
 
-// BEL used to just ring a bell on real hardware - closest sane
-// equivalent on a modern desktop is flashing the window/taskbar entry.
+// BEL used to ring a bell on real hardware - closest sane equivalent
+// here is a visual bell: fill the window with g_bell_color for a
+// beat, then put the real frame back. Works regardless of window focus
+// or what the window manager feels like doing with SDL_FlashWindow
+// (most desktops treat that as a barely visible taskbar hint, not an
+// actual flash - not worth relying on alone).
 static void render_flash(Renderer *r) {
     SDL_FlashWindow(r->win, SDL_FLASH_BRIEFLY);
+
+    SDL_SetRenderDrawColor(r->ren, g_bell_color[0], g_bell_color[1], g_bell_color[2], 255);
+    SDL_RenderClear(r->ren);
+    SDL_RenderPresent(r->ren);
+    SDL_Delay(80);
+
+    SDL_UpdateTexture(r->tex, NULL, r->fb, r->pw * 4);
+    SDL_RenderClear(r->ren);
+    SDL_RenderCopy(r->ren, r->tex, NULL, NULL);
+    SDL_RenderPresent(r->ren);
 }
 
 static void render_destroy(Renderer *r) {
