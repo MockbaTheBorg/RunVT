@@ -153,7 +153,7 @@ static int parse_hex_color(const char *s, unsigned char rgb[3]) {
 
 static void print_usage(const char *prog) {
     fprintf(stderr,
-        "usage: %s [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS]\n"
+        "usage: %s [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--zoom=N.N]\n"
         "       [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB]\n"
         "       [--log=FILE] app [args...]\n",
         prog);
@@ -166,6 +166,7 @@ int main(int argc, char **argv) {
     int rows = 25;
     int app_start = -1;
     int cols = TERM_COLS;
+    double zoom = 1.0;
     const char *log_path = NULL;
     FILE *rawlog = NULL;
 
@@ -219,6 +220,14 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "%s: --size wants COLSxROWS, e.g. 80x25\n", argv[0]);
                 return 1;
             }
+        } else if (strncmp(argv[i], "--zoom=", 7) == 0) {
+            double z;
+            if (sscanf(argv[i] + 7, "%lf", &z) == 1 && z >= 1.0) {
+                zoom = z;
+            } else {
+                fprintf(stderr, "%s: --zoom wants a number >= 1, e.g. 1.5 or 2\n", argv[0]);
+                return 1;
+            }
         } else if (strncmp(argv[i], "--", 2) == 0 && strlen(argv[i]) > 2) {
             print_usage(argv[0]);
             return 1;
@@ -264,7 +273,7 @@ int main(int argc, char **argv) {
     }
 
     sprintf(title, "RunVT %s - %s", RUNVT_VERSION, child_argv[0]);
-    if (render_init(&ren, cols, scr.total_rows, title) != 0) {
+    if (render_init(&ren, cols, scr.total_rows, title, zoom) != 0) {
         fprintf(stderr, "%s: failed to initialize SDL renderer\n", argv[0]);
         return 1;
     }

@@ -121,7 +121,7 @@ one, it'll give you a false negative. Test on real Windows (10, build
 ## Usage
 
 ```
-runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS]
+runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--zoom=N.N]
       [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB]
       [--log=FILE] app [args...]
 ```
@@ -137,6 +137,12 @@ runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS]
 - `--size=COLSxROWS` - screen size, e.g. `--size=132x43`. Defaults to
   `80x25`. That's the *addressable* area the app gets; the status bar is
   one extra row on top of that.
+- `--zoom=N.N` - start the window at N times the native pixel size, e.g.
+  `--zoom=2` or `--zoom=1.5`. Just picks the starting size - the window's
+  still free to be dragged to any size afterward, same as if you'd
+  landed there by hand. A fractional zoom starts blurred (linear
+  filtering) same as a live resize does at a non-whole scale; close
+  enough to a whole number (within 0.1) and it starts crisp instead.
 - `--bell=0xRRGGBB` - color the visual bell flashes to (see **Bell**
   below). Defaults to `0x505050`, a dim gray - a full white/inverted
   flash turned out to be pretty jarring on a black background.
@@ -155,6 +161,7 @@ runvt ./RunCPM
 runvt --size=132x43 bash
 runvt --wait --codepage=cp850 ./RunCPM
 runvt --bell=0x301010 --normal=0x00FF00 ./RunCPM
+runvt --zoom=2 ./RunCPM
 ```
 
 ### Keyboard

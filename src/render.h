@@ -41,14 +41,17 @@ static unsigned char render_palette[16][3] = {
 // invert-the-screen approach gives on a typical black background.
 static unsigned char g_bell_color[3] = {0x50, 0x50, 0x50};
 
-static int render_init(Renderer *r, int cols, int total_rows, const char *title) {
+static int render_init(Renderer *r, int cols, int total_rows, const char *title, double zoom) {
     r->pw = cols * FONT_W;
     r->ph = total_rows * FONT_H;
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) return -1;
 
+    int start_w = (int)(r->pw * zoom + 0.5);
+    int start_h = (int)(r->ph * zoom + 0.5);
     r->win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED, r->pw, r->ph, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        SDL_WINDOWPOS_CENTERED, start_w, start_h,
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!r->win) return -1;
 
     r->ren = SDL_CreateRenderer(r->win, -1,
@@ -68,10 +71,10 @@ static int render_init(Renderer *r, int cols, int total_rows, const char *title)
         SDL_TEXTUREACCESS_STREAMING, r->pw, r->ph);
     if (!r->tex) return -1;
 
-    // Nearest-neighbor keeps the bitmap font crisp at a clean scale.
-    // main.c flips this to linear mid-drag, since blur reads better
-    // than jagged at whatever odd size a live resize passes through.
-    SDL_SetTextureScaleMode(r->tex, SDL_ScaleModeNearest);
+    int zoom_round = (int)(zoom + 0.5);
+    double zoom_diff = zoom - zoom_round;
+    if (zoom_diff < 0) zoom_diff = -zoom_diff;
+    SDL_SetTextureScaleMode(r->tex, zoom_diff <= 0.1 ? SDL_ScaleModeNearest : SDL_ScaleModeLinear);
 
     r->fb = (unsigned char *)malloc((size_t)r->pw * (size_t)r->ph * 4);
     return 0;
