@@ -42,4 +42,4 @@ $(WINBIN): $(SRC) src/*.h
 	$(WINCC) $(WINCFLAGS) -o $(WINBIN) $(SRC) $(WINLDFLAGS)
 
 clean:
-	rm -f $(BIN) $(WINBIN) SDL2.dll
+	rm -f $(BIN) $(WINBIN)

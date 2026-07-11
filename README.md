@@ -104,9 +104,8 @@ Then:
 make windows
 ```
 
-This produces `runvt.exe` and copies `SDL2.dll` alongside it (dynamic
-linking against SDL2, so that DLL has to travel with the exe). Both files
-need to sit in the same folder on the Windows side.
+This produces a single `runvt.exe` - SDL2 is statically linked in, so
+there's no `SDL2.dll` to carry around. Just copy the exe over.
 
 First tried testing this under Wine, since it saves a trip to an actual
 Windows box - turned out to be a dead end. Wine's ConPTY support is
