@@ -103,6 +103,12 @@ static void handle_keydown(RT_Process *proc, SDL_Keysym *ks) {
         return;
     }
 
+    // Shift+Backspace sends DEL, for keyboards where reaching Delete is awkward.
+    if ((mod & KMOD_SHIFT) && sym == SDLK_BACKSPACE) {
+        send_str(proc, "\x7F");
+        return;
+    }
+
     switch (sym) {
         // CP/M-era apps (WordStar and friends) expect BS here, not DEL.
         // SDL gives the numpad Enter its own keycode, separate from
