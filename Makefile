@@ -1,6 +1,7 @@
 CC      = cc
-CFLAGS  = -std=c99 -pedantic -Wall -Wextra -O2 -D_DEFAULT_SOURCE $(shell pkg-config --cflags sdl2)
-LDFLAGS = $(shell pkg-config --libs sdl2) -lutil
+CFLAGS  = -std=c99 -pedantic -Wall -Wextra -O2 -D_DEFAULT_SOURCE \
+          -ffunction-sections -fdata-sections $(shell pkg-config --cflags sdl2)
+LDFLAGS = $(shell pkg-config --libs sdl2) -lutil -Wl,--gc-sections -s
 
 SRC     = src/main.c
 BIN     = RunVT
@@ -19,14 +20,15 @@ BIN     = RunVT
 WINCC        = x86_64-w64-mingw32-gcc
 WINSYSROOT   = /usr/x86_64-w64-mingw32
 WIN_PKGENV   = PKG_CONFIG_LIBDIR=$(WINSYSROOT)/lib/pkgconfig PKG_CONFIG_PATH=
-WINCFLAGS    = -std=c99 -pedantic -Wall -Wextra -O2 $(shell $(WIN_PKGENV) pkg-config --cflags sdl2)
+WINCFLAGS    = -std=c99 -pedantic -Wall -Wextra -O2 -ffunction-sections -fdata-sections \
+               $(shell $(WIN_PKGENV) pkg-config --cflags sdl2)
 WINSDL2LIB   = $(WINSYSROOT)/lib/libSDL2.a
 # from sdl2.pc's Libs.private - the system libs SDL2's own DLL build
 # normally pulls in internally, needed explicitly once SDL2 is static
 WINSYSLIBS   = -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm \
                -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion -luuid
 WINLDFLAGS   = -L$(WINSYSROOT)/lib -static -static-libgcc -lmingw32 -lSDL2main \
-               $(WINSDL2LIB) -mwindows $(WINSYSLIBS)
+               $(WINSDL2LIB) -mwindows $(WINSYSLIBS) -Wl,--gc-sections -s
 WINBIN       = RunVT.exe
 
 .PHONY: all clean windows
