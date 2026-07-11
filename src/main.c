@@ -72,6 +72,12 @@ static void send_str(RT_Process *proc, const char *s) {
     rt_write(proc, (const unsigned char *)s, (int)strlen(s));
 }
 
+static void handle_textinput(RT_Process *proc, const char *text);
+
+static void set_window_title(void *ctx, const char *title) {
+    SDL_SetWindowTitle(((Renderer *)ctx)->win, title);
+}
+
 // Only the keys that don't show up as SDL_TEXTINPUT: control keys,
 // arrows, function keys, ctrl-combos. Printable characters (including
 // accented ones) go through handle_textinput() instead, further down -
@@ -79,6 +85,17 @@ static void send_str(RT_Process *proc, const char *s) {
 static void handle_keydown(RT_Process *proc, SDL_Keysym *ks) {
     SDL_Keycode sym = ks->sym;
     Uint16 mod = ks->mod;
+
+    // Ctrl+Shift+V pastes - checked ahead of the plain ctrl-letter case
+    // below, or this would just send a literal Ctrl+V (0x16) instead.
+    if ((mod & KMOD_CTRL) && (mod & KMOD_SHIFT) && sym == SDLK_v) {
+        if (SDL_HasClipboardText()) {
+            char *text = SDL_GetClipboardText();
+            handle_textinput(proc, text);
+            SDL_free(text);
+        }
+        return;
+    }
 
     if ((mod & KMOD_CTRL) && sym >= SDLK_a && sym <= SDLK_z) {
         unsigned char b = (unsigned char)(sym - SDLK_a + 1);
@@ -197,7 +214,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    vt_init(&vp, FONT_W, FONT_H, pty_reply, &proc);
+    vt_init(&vp, FONT_W, FONT_H, pty_reply, &proc, set_window_title, &ren);
 
     // --log is a debugging aid, not something normal use needs: dumps
     // the raw bytes coming from the child so a misbehaving control
@@ -266,13 +283,20 @@ int main(int argc, char **argv) {
         } else if (!wait_prompted) {
             // reuse the vt pipeline to paint the exit prompt, rather than
             // poking cells directly - keeps this one code path for text
-            const char *msg = "\r\n\x1B[7m Press any key to close... \x1B[0m";
+            char msg[96];
+            sprintf(msg, "\r\n\x1B[7m Press any key to close... (exit code %d) \x1B[0m",
+                    proc.exit_code);
             if (wait_flag) {
                 vt_process(&scr, &vp, &sixel, (const unsigned char *)msg, (int)strlen(msg));
             } else {
                 running = 0;
             }
             wait_prompted = 1;
+        }
+
+        if (vp.bell) {
+            render_flash(&ren);
+            vp.bell = 0;
         }
 
         // SDL tracks capslock as toggle state, not a press/release

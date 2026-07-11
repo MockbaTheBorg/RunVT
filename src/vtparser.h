@@ -43,17 +43,31 @@ typedef struct {
 
     int (*reply)(void *ctx, const unsigned char *buf, int len);
     void *reply_ctx;
+
+    // OSC (window title, mostly) - buffered until its terminator shows
+    // up, which is either BEL or the two-byte ST (ESC \).
+    char osc_buf[256];
+    size_t osc_len;
+    int osc_pending_st;
+    void (*set_title)(void *ctx, const char *title);
+    void *title_ctx;
+
+    int bell; // set on BEL, cleared by whoever's watching for it
 } VTParser;
 
 static void vt_init(VTParser *p, int cell_w, int cell_h,
                      int (*reply)(void *, const unsigned char *, int),
-                     void *reply_ctx) {
+                     void *reply_ctx,
+                     void (*set_title)(void *, const char *),
+                     void *title_ctx) {
     memset(p, 0, sizeof(*p));
     p->state = VT_ST_NORMAL;
     p->cell_w = cell_w;
     p->cell_h = cell_h;
     p->reply = reply;
     p->reply_ctx = reply_ctx;
+    p->set_title = set_title;
+    p->title_ctx = title_ctx;
 }
 
 static void vt_free(VTParser *p) {
@@ -113,6 +127,18 @@ static int vt_praw(VTParser *p, int idx, int def) {
 
 static void vt_reply_str(VTParser *p, const char *s) {
     if (p->reply) p->reply(p->reply_ctx, (const unsigned char *)s, (int)strlen(s));
+}
+
+// OSC payload is "Ps;Pt" - Ps=0 (icon+title) or 2 (title only) are the
+// ones every shell/editor actually uses, so that's all we bother with.
+static void vt_finish_osc(VTParser *p) {
+    p->osc_buf[p->osc_len] = '\0';
+    char *semi = strchr(p->osc_buf, ';');
+    if (!semi) return;
+    int ps = atoi(p->osc_buf);
+    if ((ps == 0 || ps == 2) && p->set_title) {
+        p->set_title(p->title_ctx, semi + 1);
+    }
 }
 
 // SGR params chain: "CSI 1;31m" means bold AND red, so we walk the
@@ -231,6 +257,7 @@ static void vt_feed_byte(Screen *s, VTParser *p, SixelLayer *sl, unsigned char b
     // state means a malformed CSI/OSC/DCS can't wedge the parser.
     if (b == 0x1B) {
         if (p->state == VT_ST_DCS) vt_finish_dcs(p, s, sl);
+        else if (p->state == VT_ST_OSC) p->osc_pending_st = 1; // might be ST (ESC \)
         p->state = VT_ST_ESC;
         return;
     }
@@ -250,7 +277,8 @@ static void vt_feed_byte(Screen *s, VTParser *p, SixelLayer *sl, unsigned char b
                     case 0x0D: scr_cr(s); break;
                     case 0x0E: s->gl_is_g1 = 1; break;
                     case 0x0F: s->gl_is_g1 = 0; break;
-                    default: break; // BEL and other controls: no-op, we're not beeping at anyone
+                    case 0x07: p->bell = 1; break;
+                    default: break;
                 }
             } else if (b != 0x7F) {
                 scr_putc(s, b, sl);
@@ -261,7 +289,7 @@ static void vt_feed_byte(Screen *s, VTParser *p, SixelLayer *sl, unsigned char b
             switch (b) {
                 case '[': p->state = VT_ST_CSI; p->nparams = 0; p->building = 0;
                           p->private_marker = 0; break;
-                case ']': p->state = VT_ST_OSC; break;
+                case ']': p->state = VT_ST_OSC; p->osc_len = 0; break;
                 case 'P': p->state = VT_ST_DCS; p->dcs_len = 0; break;
                 case '(': p->state = VT_ST_SCS_G0; break;
                 case ')': p->state = VT_ST_SCS_G1; break;
@@ -282,6 +310,10 @@ static void vt_feed_byte(Screen *s, VTParser *p, SixelLayer *sl, unsigned char b
                     s->cur_fg = 7; s->cur_bg = 0; s->cur_attr = 0;
                     s->g0_charset = CHARSET_NORMAL; s->g1_charset = CHARSET_NORMAL;
                     s->gl_is_g1 = 0;
+                    p->state = VT_ST_NORMAL;
+                    break;
+                case '\\':
+                    if (p->osc_pending_st) { vt_finish_osc(p); p->osc_pending_st = 0; }
                     p->state = VT_ST_NORMAL;
                     break;
                 default: p->state = VT_ST_NORMAL; break;
@@ -310,7 +342,12 @@ static void vt_feed_byte(Screen *s, VTParser *p, SixelLayer *sl, unsigned char b
             break;
 
         case VT_ST_OSC:
-            if (b == 0x07) p->state = VT_ST_NORMAL;
+            if (b == 0x07) {
+                vt_finish_osc(p);
+                p->state = VT_ST_NORMAL;
+            } else if (p->osc_len + 1 < sizeof(p->osc_buf)) {
+                p->osc_buf[p->osc_len++] = (char)b;
+            }
             break;
 
         case VT_ST_DCS:

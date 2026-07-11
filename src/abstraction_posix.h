@@ -130,7 +130,7 @@ static int rt_write(RT_Process *proc, const unsigned char *buf, int len) {
 
 // Nonblocking check for whether the child has exited. Returns 1 if
 // it's still running, 0 once it's gone (exit code lands in
-// proc->exit_code, though right now nobody actually looks at it).
+// proc->exit_code, shown in the --wait prompt).
 static int rt_child_alive(RT_Process *proc) {
     if (proc->exited) {
         return 0;

@@ -42,6 +42,12 @@ Just spawn a program and be its terminal.
 - **Keyboard passthrough**: arrows, function keys (PF1-4), Ctrl combos, and
   proper UTF-8-to-codepage encoding so typing accented characters on your
   keyboard sends the right byte to the app.
+- **Clipboard paste** - Ctrl+Shift+V pastes the system clipboard, run
+  through the same UTF-8-to-codepage path as typed keys.
+- **Window title updates** - apps that send the OSC title sequence (vim,
+  tmux, plenty of shells) get to rename the window, same as any other
+  terminal would let them.
+- **Bell** - BEL flashes the window instead of doing nothing.
 
 ## What it deliberately doesn't do
 
@@ -117,8 +123,9 @@ runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--log=FILE] app [ar
 ```
 
 - `app [args...]` - the program to run, and its arguments. Required.
-- `--wait` - after the app exits, show "Press any key to close..." instead
-  of closing the window immediately. Handy for double-click-launched use.
+- `--wait` - after the app exits, show "Press any key to close... (exit
+  code N)" instead of closing the window immediately. Handy for
+  double-click-launched use.
 - `--codepage=latin1|cp850` - which table backs the upper 128 characters.
   Defaults to `latin1`. Doesn't live-switch mid-session (real apps don't
   send codepage-switch sequences, they just assume the terminal is already
@@ -145,6 +152,8 @@ real VT100 PF1-PF4 codes (`ESC O P/Q/R/S`). Backspace sends `BS` (0x08),
 not `DEL` - that's the CP/M-era convention (WordStar and friends expect
 it), not what most modern terminals default to. Worth knowing if an app
 seems to eat the wrong character on backspace.
+
+Ctrl+Shift+V pastes whatever's on the system clipboard.
 
 ## Testing it
 
@@ -217,4 +226,4 @@ don't hand-edit the generated files.
 
 ## Version
 
-1.0.
+1.1.

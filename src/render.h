@@ -54,6 +54,12 @@ static int render_init(Renderer *r, int cols, int total_rows, const char *title)
     return 0;
 }
 
+// BEL used to just ring a bell on real hardware - closest sane
+// equivalent on a modern desktop is flashing the window/taskbar entry.
+static void render_flash(Renderer *r) {
+    SDL_FlashWindow(r->win, SDL_FLASH_BRIEFLY);
+}
+
 static void render_destroy(Renderer *r) {
     free(r->fb);
     if (r->tex) SDL_DestroyTexture(r->tex);
