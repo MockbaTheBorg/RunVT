@@ -160,6 +160,8 @@ static void print_usage(const char *prog) {
 }
 
 int main(int argc, char **argv) {
+    rt_attach_console();
+
     int wait_flag = 0;
     int rows = 25;
     int app_start = -1;

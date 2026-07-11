@@ -22,6 +22,7 @@
 
 #include <windows.h>
 #include <string.h>
+#include <stdio.h>
 
 // Trying to work around older headers rather than
 // making everyone upgrade their mingw-w64 package.
@@ -41,6 +42,13 @@ typedef struct RT_Process {
     int exited;
     int exit_code;
 } RT_Process;
+
+static void rt_attach_console(void) {
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+    }
+}
 
 static int rt_spawn(RT_Process *proc, char *const argv[], int cols, int rows) {
     HANDLE in_read = NULL, in_write = NULL;

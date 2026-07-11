@@ -25,6 +25,8 @@ typedef struct RT_Process {
     int exit_code;
 } RT_Process;
 
+static void rt_attach_console(void) { }
+
 // Spawns argv[0] with args argv (NULL-terminated) as a child attached
 // to a fresh pty. cols/rows become the pty's initial window size, so
 // the child sees the right dimensions from the start instead of
