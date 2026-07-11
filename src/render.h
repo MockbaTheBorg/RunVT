@@ -48,7 +48,7 @@ static int render_init(Renderer *r, int cols, int total_rows, const char *title)
     if (SDL_Init(SDL_INIT_VIDEO) != 0) return -1;
 
     r->win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED, r->pw, r->ph, SDL_WINDOW_SHOWN);
+        SDL_WINDOWPOS_CENTERED, r->pw, r->ph, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!r->win) return -1;
 
     r->ren = SDL_CreateRenderer(r->win, -1,
@@ -56,20 +56,35 @@ static int render_init(Renderer *r, int cols, int total_rows, const char *title)
     if (!r->ren) r->ren = SDL_CreateRenderer(r->win, -1, 0);
     if (!r->ren) return -1;
 
+    // Scales the fixed framebuffer to whatever pixel size the window
+    // actually is. Letterboxes mid-drag - main.c squares that away
+    // once the drag settles (see the resize handling in main).
+    SDL_RenderSetLogicalSize(r->ren, r->pw, r->ph);
+
+    // Below 1x is just mush - the font's native res is the floor.
+    SDL_SetWindowMinimumSize(r->win, r->pw, r->ph);
+
     r->tex = SDL_CreateTexture(r->ren, SDL_PIXELFORMAT_RGBA32,
         SDL_TEXTUREACCESS_STREAMING, r->pw, r->ph);
     if (!r->tex) return -1;
+
+    // Nearest-neighbor keeps the bitmap font crisp at a clean scale.
+    // main.c flips this to linear mid-drag, since blur reads better
+    // than jagged at whatever odd size a live resize passes through.
+    SDL_SetTextureScaleMode(r->tex, SDL_ScaleModeNearest);
 
     r->fb = (unsigned char *)malloc((size_t)r->pw * (size_t)r->ph * 4);
     return 0;
 }
 
-// BEL used to ring a bell on real hardware - closest sane equivalent
-// here is a visual bell: fill the window with g_bell_color for a
-// beat, then put the real frame back. Works regardless of window focus
-// or what the window manager feels like doing with SDL_FlashWindow
-// (most desktops treat that as a barely visible taskbar hint, not an
-// actual flash - not worth relying on alone).
+static void render_set_scale_mode(Renderer *r, SDL_ScaleMode mode) {
+    SDL_SetTextureScaleMode(r->tex, mode);
+}
+
+// BEL used to ring a bell on real hardware - here it's a visual bell
+// instead: fill the window with g_bell_color for a beat, then restore
+// the real frame. SDL_FlashWindow alone isn't enough - most desktops
+// just flash a barely-visible taskbar dot with it.
 static void render_flash(Renderer *r) {
     SDL_FlashWindow(r->win, SDL_FLASH_BRIEFLY);
 

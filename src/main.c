@@ -178,6 +178,12 @@ int main(int argc, char **argv) {
     int wait_prompted = 0;
     char title[256];
 
+    // No cross-platform "mouse released" event exists for a window
+    // resize, so we fake it: wait for a gap in resize events instead.
+    #define RESIZE_SETTLE_MS 150
+    int resize_pending = 0;
+    Uint32 last_resize_tick = 0;
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--wait") == 0) {
             wait_flag = 1;
@@ -276,6 +282,17 @@ int main(int argc, char **argv) {
                 running = 0;
                 continue;
             }
+            if (ev.type == SDL_WINDOWEVENT && ev.window.event == SDL_WINDOWEVENT_RESIZED) {
+                // Let it sit wherever the drag put it - linear filter
+                // so a non-integer scale blurs instead of looking
+                // jagged. The settle check below cleans it up once the
+                // drag stops.
+                render_set_scale_mode(&ren, SDL_ScaleModeLinear);
+                resize_pending = 1;
+                last_resize_tick = SDL_GetTicks();
+                scr.dirty = 1; // redraw at the new size right away, not on the next unrelated change
+                continue;
+            }
             if (!child_alive) {
                 if (wait_flag && (ev.type == SDL_KEYDOWN || ev.type == SDL_TEXTINPUT)) {
                     running = 0;
@@ -289,6 +306,37 @@ int main(int argc, char **argv) {
             }
         }
         if (!running) break;
+
+        // Drag's over - square up both dimensions to one scale factor
+        // (kills the letterbox either way). Close to a whole number
+        // (within 0.1)? Snap to it and go crisp. Otherwise leave it
+        // fractional and blurry - beats a jagged in-between scale.
+        if (resize_pending && SDL_GetTicks() - last_resize_tick >= RESIZE_SETTLE_MS) {
+            int w, h;
+            SDL_GetWindowSize(ren.win, &w, &h);
+            double kx = (double)w / ren.pw;
+            double ky = (double)h / ren.ph;
+            double k = kx > ky ? kx : ky;
+            if (k < 1.0) k = 1.0;
+
+            int nearest = (int)(k + 0.5);
+            if (nearest < 1) nearest = 1;
+            double diff = k - nearest;
+            if (diff < 0) diff = -diff;
+
+            if (diff <= 0.1) {
+                k = nearest;
+                render_set_scale_mode(&ren, SDL_ScaleModeNearest);
+            } else {
+                render_set_scale_mode(&ren, SDL_ScaleModeLinear);
+            }
+
+            int nw = (int)(ren.pw * k + 0.5);
+            int nh = (int)(ren.ph * k + 0.5);
+            if (nw != w || nh != h) SDL_SetWindowSize(ren.win, nw, nh);
+            scr.dirty = 1;
+            resize_pending = 0;
+        }
 
         if (child_alive) {
             if (rt_child_alive(&proc)) {
