@@ -3,7 +3,7 @@ CFLAGS  = -std=c99 -pedantic -Wall -Wextra -O2 -D_DEFAULT_SOURCE $(shell pkg-con
 LDFLAGS = $(shell pkg-config --libs sdl2) -lutil
 
 SRC     = src/main.c
-BIN     = runvt
+BIN     = RunVT
 
 # Windows cross-build via MinGW-w64. Needs SDL2's official mingw devel
 # package installed into the mingw sysroot (see README) - regular apt
@@ -13,7 +13,7 @@ BIN     = runvt
 # which the linker would resolve to the dynamic import lib instead) and
 # pull in sdl2.pc's Libs.private - the Windows system libs SDL2's own
 # DLL build normally hides internally, needed explicitly once SDL2 is
-# static. The only DLLs runvt.exe ends up depending on are ones every
+# static. The only DLLs RunVT.exe ends up depending on are ones every
 # Windows install already has (kernel32, user32, gdi32, etc) - no SDL2.dll
 # needs to travel with it.
 WINCC        = x86_64-w64-mingw32-gcc
@@ -27,7 +27,7 @@ WINSYSLIBS   = -lm -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm \
                -limm32 -lole32 -loleaut32 -lshell32 -lsetupapi -lversion -luuid
 WINLDFLAGS   = -L$(WINSYSROOT)/lib -static -static-libgcc -lmingw32 -lSDL2main \
                $(WINSDL2LIB) -mwindows $(WINSYSLIBS)
-WINBIN       = runvt.exe
+WINBIN       = RunVT.exe
 
 .PHONY: all clean windows
 
