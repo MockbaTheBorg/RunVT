@@ -130,6 +130,12 @@ static void handle_keydown(RT_Process *proc, SDL_Keysym *ks) {
         case SDLK_F2:        send_str(proc, "\x1BOQ"); break;
         case SDLK_F3:        send_str(proc, "\x1BOR"); break;
         case SDLK_F4:        send_str(proc, "\x1BOS"); break;
+        // Wordstar Arrows on Num-Keypad - NumLock has to be off
+		// 8 up - 2 down - 4 left - 6 right
+        case SDLK_KP_8:        send_str(proc, "\x05"); break;
+        case SDLK_KP_2:        send_str(proc, "\x18"); break;
+        case SDLK_KP_4:        send_str(proc, "\x13"); break;
+        case SDLK_KP_6:        send_str(proc, "\x04"); break;	        
         default: break;
     }
 }
