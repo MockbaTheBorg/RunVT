@@ -118,6 +118,126 @@ cross-compiling and want a sanity check, don't bother with Wine for this
 one, it'll give you a false negative. Test on real Windows (10, build
 1809+, or 11).
 
+## Embedding in RunCPM (no PTY at all)
+
+This started as a Windows bug: sixel graphics and DEC Special Graphics
+box-drawing worked fine on Linux but silently didn't on Windows. Turned
+out ConPTY hosts a real hidden `conhost.exe` that parses everything the
+child writes, then hands RunVT a *reserialized* stream based on its own
+internal screen-buffer model - not the raw bytes. Anything conhost's
+parser doesn't know about (sixel DCS, some charset designations) just
+gets dropped before RunVT ever sees it. There's no "passthrough mode" to
+turn that off - it's how ConPTY works.
+
+The fix ended up being bigger than a workaround: link RunVT directly
+into RunCPM instead of spawning it as a child over a pty at all. One
+executable, RunCPM's console I/O calls go straight into RunVT's
+screen/vtparser/render core as plain function calls in the same
+process. No pty, pipe, or ConPTY in between, so there's nothing left to
+reinterpret the stream - and since it's just function calls either way,
+it works identically on Linux and Windows.
+
+The reusable core (`runvt_core.h`) is what makes this possible - it's
+the same screen/parser/render/event-pump code the standalone `runvt`
+binary uses, just without anything that assumes a child process exists.
+
+This needs a handful of small changes on RunCPM's own side too (not
+part of this repo, since RunVT doesn't touch RunCPM's source directly):
+
+- `globals.h` gets a `RUNVT_EMBED` flag, same pattern as the existing
+  `STREAMIO` flag - passed externally with `-DRUNVT_EMBED`.
+- `abstraction_posix.h` / `abstraction_windows.h` get their console
+  block (just `_console_init`/`_console_reset`/`_kbhit`/`_getch`/
+  `_putch`/`_getche`/`_clrscr`) wrapped in `#ifndef RUNVT_EMBED`. Disk,
+  host init, and hardware functions are left alone.
+- `main.c` gets one more branch next to the existing `_WIN32`/posix
+  check, picking a new `abstraction_runvt.h` when `RUNVT_EMBED` is set.
+- `abstraction_runvt.h` (new file) implements those same console
+  primitives on top of `runvt_core.h`. It's also where the SDL event
+  pump happens - inside `_putch`/`_kbhit`/`_getch`/`_clrscr`, since
+  every console byte in or out passes through one of those regardless
+  of whether the running program used a BIOS or BDOS call. Turned out
+  to be a reliable pump point without needing to touch `cpm.h` or any
+  of the `cpu*.h` CPU cores.
+- A new `Makefile.runvt`, registered as a `runvt` platform in the top
+  `Makefile`.
+
+### Building (Linux, or Windows via MSYS2/mingw)
+
+RunCPM's repo nests a `RunCPM/RunCPM/` folder - same reason the Arduino
+sketch needs its `.ino` sitting in a same-named folder. That inner one
+is where `main.c`, `Makefile.runvt`, and the other platform Makefiles
+actually live, and it's where `make runvt build` needs to run from.
+Clone RunVT in there:
+
+```
+RunCPM/                <- outer repo folder
+  RunCPM/               <- inner folder: main.c, Makefile, Makefile.runvt, ...
+    RunVT/               <- clone RunVT here
+      src/
+    main.c
+    Makefile.runvt
+    ...
+```
+
+Then, from that inner `RunCPM/RunCPM/` folder:
+
+```
+make runvt build
+```
+
+Same `CCP=`/`CPU=`/`CPM3=` overrides as the other platforms work here
+too, e.g. `make runvt CPU=cpu2 build`. If RunVT is cloned somewhere else
+instead, point `RUNVT_DIR` at it (relative to that same inner folder, or
+absolute):
+
+```
+make runvt build RUNVT_DIR=/path/to/RunVT
+```
+
+This needs SDL2's dev package on the include/link path (`pkg-config
+sdl2` must resolve) - same requirement as building `runvt` itself, see
+**Building** above.
+
+### Building with Visual Studio
+
+RunCPM's `.vcxproj` doesn't have a configuration for this wired in -
+neither does `STREAMIO`, for what it's worth, so this isn't a new gap.
+Both are meant to be turned on by hand when you actually want them. To
+build RunCPM with RunVT embedded from Visual Studio:
+
+1. Clone RunVT somewhere reachable from the project (e.g. into
+   RunCPM's folder).
+2. Project Properties → C/C++ → Preprocessor → **Preprocessor
+   Definitions**: add `RUNVT_EMBED`.
+3. Project Properties → C/C++ → General → **Additional Include
+   Directories**: add the path to RunVT's `src` folder.
+4. Project Properties → Linker → General → **Additional Library
+   Directories**: add SDL2's `lib\x64` (or `x86`) folder from the
+   [SDL2 development package](https://github.com/libsdl-org/SDL/releases)
+   (VC variant).
+5. Project Properties → Linker → Input → **Additional Dependencies**:
+   add `SDL2.lib;SDL2main.lib`.
+6. Copy `SDL2.dll` next to the built executable (or add a post-build
+   step to do it) - this VS route links SDL2 dynamically, unlike the
+   Makefile route which links it statically.
+
+No source changes needed - `main.c`'s existing `#ifdef RUNVT_EMBED`
+branch picks up `abstraction_runvt.h` once the define is set.
+
+### Notes
+
+- Needs a real display/window session - it won't run headless. Same
+  requirement standalone RunVT always had, just easier to forget here
+  since there's no separate terminal window around to make it obvious.
+- First pass at this pumped and redrew on every single character out,
+  and console text got painfully slow - turns out `render.h` presents
+  with vsync on, so a redraw per byte caps output at the monitor's
+  refresh rate, a handful of characters a frame at best. Fixed by
+  time-gating the actual redraw to roughly 15ms; the screen buffer
+  itself still updates immediately per character, only the on-screen
+  redraw gets batched.
+
 ## Usage
 
 ```
@@ -214,7 +334,8 @@ handle directly. Everything else is plain, portable C in header files:
 | `vtparser.h` | The VT100/ANSI control sequence state machine |
 | `sixel.h` | Sixel graphics decoder and pixel overlay |
 | `render.h` | Blits the cell grid + sixel overlay to the SDL2 window |
-| `main.c` | Argument parsing, the event loop, keyboard handling |
+| `runvt_core.h` | The reusable terminal core (screen/sixel/parser/render/event pump) - what `main.c` and RunCPM's embedded build both drive |
+| `main.c` | Argument parsing, spawning the child over a pty, and the standalone event loop |
 
 SDL2 is the one dependency, and it's what keeps the OS-specific surface so
 small in the first place - it already abstracts window creation, input,
