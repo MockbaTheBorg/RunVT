@@ -213,7 +213,7 @@ static void rt_core_feed(RunVT *vt, const unsigned char *buf, int len) {
     vt_process(&vt->scr, &vt->vp, &vt->sixel, buf, len);
 }
 
-static void rt_core_set_input_enabled(RunVT *vt, int enabled) {
+static inline void rt_core_set_input_enabled(RunVT *vt, int enabled) {
     vt->input_enabled = enabled;
 }
 
