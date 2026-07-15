@@ -158,9 +158,17 @@ part of this repo, since RunVT doesn't touch RunCPM's source directly):
   every console byte in or out passes through one of those regardless
   of whether the running program used a BIOS or BDOS call. Turned out
   to be a reliable pump point without needing to touch `cpm.h` or any
-  of the `cpu*.h` CPU cores.
+  of the `cpu*.h` CPU cores. On Windows it also has to dodge conio.h's
+  own `_getch`/`_putch`/`_getche` declarations - different signatures
+  than the ones defined here, so a real compiler error rather than
+  just a redeclaration warning - by renaming them out of the way for
+  the duration of the `abstraction_windows.h` include.
 - A new `Makefile.runvt`, registered as a `runvt` platform in the top
-  `Makefile`.
+  `Makefile`. There's also a `Makefile.runvtwin` (`runvtwin` platform)
+  that cross-compiles the same embed into a Windows `.exe` from Linux
+  via mingw-w64, statically linked the same way RunVT's own `make
+  windows` target is - handy for testing the Windows build without a
+  Windows box.
 
 ### Building (Linux, or Windows via MSYS2/mingw)
 
@@ -197,7 +205,24 @@ make runvt build RUNVT_DIR=/path/to/RunVT
 
 This needs SDL2's dev package on the include/link path (`pkg-config
 sdl2` must resolve) - same requirement as building `runvt` itself, see
-**Building** above.
+**Building** above. Bare Windows mingw toolchains without MSYS2 often
+don't have `pkg-config` at all, though - if that's you, point
+`SDL2DIR` at wherever SDL2's `include`/`lib` folders live instead and
+it skips pkg-config entirely:
+
+```
+mingw32-make -f Makefile.runvt SDL2DIR=C:/mingw64/x86_64-w64-mingw32 build
+```
+
+To cross-compile a Windows `.exe` from Linux instead of building
+natively, use `runvtwin` in place of `runvt` - same folder layout,
+same `RUNVT_DIR`/`CCP`/`CPU`/`CPM3` overrides, just needs SDL2's
+mingw-w64 dev package installed in the mingw sysroot (see **Building
+for Windows** above):
+
+```
+make runvtwin build
+```
 
 ### Building with Visual Studio
 
@@ -237,6 +262,16 @@ branch picks up `abstraction_runvt.h` once the define is set.
   time-gating the actual redraw to roughly 15ms; the screen buffer
   itself still updates immediately per character, only the on-screen
   redraw gets batched.
+- Clicking the window's close button ends the process immediately,
+  right from inside the SDL pump - it doesn't wait for RunCPM's own
+  Status flag to unwind the Z80 core gracefully. Tried that first and
+  it didn't work reliably: cpu1-4.h dispatch opcodes via computed
+  goto, so a program idling in a tight console-poll loop (the CCP at
+  its prompt, most of the time) can go a long while without ever
+  rechecking Status. The old pty setup never had this problem since
+  closing the window just killed the child process outright - there's
+  no separate process here to kill out from under it, so this just
+  exits directly instead.
 
 ## Usage
 
