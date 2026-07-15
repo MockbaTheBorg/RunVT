@@ -23,13 +23,23 @@ typedef struct {
     unsigned char *pixels; // RGBA, pw*ph*4 bytes
     int pw;
     int ph;
+    int paint_ph; // exclusive y limit for sixel_paint - excludes the status line
 } SixelLayer;
 
 static void sixel_init(SixelLayer *sl, int pw, int ph) {
     sl->pw = pw;
     sl->ph = ph;
+    sl->paint_ph = ph;
     sl->pixels = (unsigned char *)malloc((size_t)pw * (size_t)ph * 4);
     memset(sl->pixels, 0, (size_t)pw * (size_t)ph * 4);
+}
+
+// Restricts where sixel_paint will place pixels, so an image drawn (or
+// scrolled) past the addressable rows can't bleed into the status line.
+// Everything else (scroll/clear/shift) already keys off text-row ranges
+// that stay within the addressable rows, so only painting needs this.
+static void sixel_set_paint_limit(SixelLayer *sl, int paint_ph) {
+    sl->paint_ph = paint_ph;
 }
 
 static void sixel_free(SixelLayer *sl) {
@@ -165,7 +175,7 @@ static const unsigned char sixel_default_palette[16][3] = {
 };
 
 static void sixel_paint(SixelLayer *sl, int x, int y, const unsigned char rgb[3]) {
-    if (x < 0 || y < 0 || x >= sl->pw || y >= sl->ph) return;
+    if (x < 0 || y < 0 || x >= sl->pw || y >= sl->paint_ph) return;
     unsigned char *p = &sl->pixels[(y * sl->pw + x) * 4];
     p[0] = rgb[0];
     p[1] = rgb[1];
