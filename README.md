@@ -277,7 +277,7 @@ branch picks up `abstraction_runvt.h` once the define is set.
 
 ```
 runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--zoom=N.N]
-      [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB]
+      [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB] [--fullscreen]
       [--log=FILE] app [args...]
 ```
 
@@ -308,6 +308,10 @@ runvt [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--zoom=N.N]
   "no color specified" case changes.
 - `--log=FILE` - dumps the raw bytes coming from the child to a file.
   Debugging aid, not something you need for normal use.
+- `--fullscreen` - open borderless, filling the whole screen at its
+  native resolution (SDL's "fullscreen desktop" mode) instead of a
+  regular window. The fixed cell grid is scaled up to fit, same as
+  dragging a windowed instance larger.
 
 Examples:
 

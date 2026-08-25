@@ -49,7 +49,7 @@ static int parse_hex_color(const char *s, unsigned char rgb[3]) {
 static void print_usage(const char *prog) {
     fprintf(stderr,
         "usage: %s [--wait] [--codepage=latin1|cp850] [--size=COLSxROWS] [--zoom=N.N]\n"
-        "       [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB]\n"
+        "       [--bell=0xRRGGBB] [--normal=0xRRGGBB] [--bold=0xRRGGBB] [--fullscreen]\n"
         "       [--log=FILE] app [args...]\n",
         prog);
 }
@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
     rt_attach_console();
 
     int wait_flag = 0;
+    int fullscreen = 0;
     int rows = 25;
     int app_start = -1;
     int cols = TERM_COLS;
@@ -77,6 +78,8 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--wait") == 0) {
             wait_flag = 1;
+        } else if (strcmp(argv[i], "--fullscreen") == 0) {
+            fullscreen = 1;
         } else if (strncmp(argv[i], "--codepage=", 11) == 0) {
             const char *v = argv[i] + 11;
             codepage = (strcmp(v, "cp850") == 0) ? CODEPAGE_CP850 : CODEPAGE_LATIN1;
@@ -157,6 +160,7 @@ int main(int argc, char **argv) {
     cfg.zoom = zoom;
     cfg.title = title;
     cfg.codepage = codepage;
+    cfg.fullscreen = fullscreen;
     cfg.input_cb = pty_reply;
     cfg.input_ctx = &proc;
 

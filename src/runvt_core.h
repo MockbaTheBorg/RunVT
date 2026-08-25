@@ -41,6 +41,7 @@ typedef struct {
     double zoom;
     const char *title;
     int codepage;          // CODEPAGE_LATIN1 or CODEPAGE_CP850, see cp850_encode.h
+    int fullscreen;        // borderless, native-res window (SDL_WINDOW_FULLSCREEN_DESKTOP)
     rt_input_cb input_cb;
     void *input_ctx;
 } RunVTConfig;
@@ -198,7 +199,7 @@ static int rt_core_init(RunVT *vt, const RunVTConfig *cfg) {
 
     vt_init(&vt->vp, FONT_W, FONT_H, cfg->input_cb, cfg->input_ctx, rt_core_set_title, &vt->ren);
 
-    if (render_init(&vt->ren, cfg->cols, vt->scr.total_rows, cfg->title, cfg->zoom) != 0) {
+    if (render_init(&vt->ren, cfg->cols, vt->scr.total_rows, cfg->title, cfg->zoom, cfg->fullscreen) != 0) {
         return -1;
     }
 

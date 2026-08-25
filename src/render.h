@@ -41,7 +41,7 @@ static unsigned char render_palette[16][3] = {
 // invert-the-screen approach gives on a typical black background.
 static unsigned char g_bell_color[3] = {0x50, 0x50, 0x50};
 
-static int render_init(Renderer *r, int cols, int total_rows, const char *title, double zoom) {
+static int render_init(Renderer *r, int cols, int total_rows, const char *title, double zoom, int fullscreen) {
     r->pw = cols * FONT_W;
     r->ph = total_rows * FONT_H;
 
@@ -49,9 +49,10 @@ static int render_init(Renderer *r, int cols, int total_rows, const char *title,
 
     int start_w = (int)(r->pw * zoom + 0.5);
     int start_h = (int)(r->ph * zoom + 0.5);
+    Uint32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+    if (fullscreen) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     r->win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED, start_w, start_h,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        SDL_WINDOWPOS_CENTERED, start_w, start_h, flags);
     if (!r->win) return -1;
 
     r->ren = SDL_CreateRenderer(r->win, -1,
