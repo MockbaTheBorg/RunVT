@@ -8,7 +8,12 @@
 #ifndef RUNVT_ABSTRACTION_POSIX_H
 #define RUNVT_ABSTRACTION_POSIX_H
 
-#include <pty.h>
+#if defined(__APPLE__)
+	#include <util.h>
+#else
+	#include <pty.h>
+#endif
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
