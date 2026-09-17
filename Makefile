@@ -1,7 +1,17 @@
 CC      = cc
 CFLAGS  = -std=c99 -pedantic -Wall -Wextra -O2 -D_DEFAULT_SOURCE \
           -ffunction-sections -fdata-sections $(shell pkg-config --cflags sdl2)
-LDFLAGS = $(shell pkg-config --libs sdl2) -lutil -Wl,--gc-sections -s
+LDFLAGS = $(shell pkg-config --libs sdl2) -lutil
+
+# special handling for Mac OS as it's linker does not support
+# the garbage collection of unused sections and stripping with the
+# same command line as GCC on Linux and Windows.
+UNAME   = $(shell uname -s)
+ifeq ($(UNAME), Darwin)
+	LDFLAGS  += -dead_strip
+else
+	LDFLAGS += -Wl,--gc-sections -s
+endif
 
 SRC     = src/main.c
 BIN     = RunVT
